@@ -8,16 +8,16 @@ BEGIN
 	@ISA = qw(Exporter);
 	@EXPORT = qw(&create_post);
 
-	my $database = "djangodb";
-	my $user = "djangouser";
-	my $password = "djpasswd";
+	my $database = "db_forums";
+	my $user = "root";
+	my $password = "PwD73HDa";
 
 	$dbh = DBI->connect("DBI:mysql:$database", $user, $password);
 }
 
 sub create_post 
 {
-	$query = $dbh->prepare("select count(*) from ask_question;");
+	$query = $dbh->prepare("select count(*) from forum;");
 	$query->execute;
 	my $result = "";
 
@@ -26,9 +26,13 @@ sub create_post
 		$result .= join(", ", @data);
 	}
 
+	$query->finish;
 	return $result;
 }
 
 1;
 
-END {}
+END
+{
+	$dbh->disconnect;
+}
