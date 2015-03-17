@@ -2,6 +2,8 @@
 use Mojolicious::Lite;
 use TechDBApi;
 
+mysql_connect('db_forums', 'root', 'root');
+
 get '/' => sub {
 	my $c = shift;
 	$c->render(text => 'Hello, World!');

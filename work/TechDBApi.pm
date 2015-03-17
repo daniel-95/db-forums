@@ -6,11 +6,17 @@ BEGIN
 {
 	use Exporter ();
 	@ISA = qw(Exporter);
-	@EXPORT = qw(&create_post);
+	@EXPORT = qw(&create_post &mysql_connect);
+}
 
-	my $database = "db_forums";
-	my $user = "root";
-	my $password = "PwD73HDa";
+#db handler
+$dbh = 0;
+
+sub mysql_connect
+{
+	$database = shift;
+	$user = shift;
+	$password = shift;
 
 	$dbh = DBI->connect("DBI:mysql:$database", $user, $password);
 }
