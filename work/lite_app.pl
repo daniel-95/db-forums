@@ -11,7 +11,12 @@ get '/' => sub {
 
 get '/create_post' => sub {
 	my $c = shift;
-	$c->render(text => create_post());
+	$c->render(text => check());
+};
+
+get '/db/api/clear' => sub {
+	my $c = shift;
+	$c->render(text => clear());
 };
 
 app->start;

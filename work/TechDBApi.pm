@@ -6,7 +6,7 @@ BEGIN
 {
 	use Exporter ();
 	@ISA = qw(Exporter);
-	@EXPORT = qw(&create_post &mysql_connect);
+	@EXPORT = qw(&check &clear &mysql_connect);
 }
 
 #db handler
@@ -14,16 +14,16 @@ $dbh = 0;
 
 sub mysql_connect
 {
-	$database = shift;
-	$user = shift;
-	$password = shift;
+	my $database = shift;
+	my $user = shift;
+	my $password = shift;
 
 	$dbh = DBI->connect("DBI:mysql:$database", $user, $password);
 }
 
-sub create_post 
+sub check 
 {
-	$query = $dbh->prepare("select count(*) from forum;");
+	my $query = $dbh->prepare("select count(*) from user;");
 	$query->execute;
 	my $result = "";
 
@@ -34,6 +34,30 @@ sub create_post
 
 	$query->finish;
 	return $result;
+}
+
+sub clear
+{
+	@tables = qw(user forum thread post subscription follow);
+	$dbh->do("SET session foreign_key_checks = 0;");
+
+	foreach(@tables)
+	{
+		my $query = $dbh->prepare("TRUNCATE TABLE `".$_."`;");
+		$res = $query->execute;
+		print $_.": ".$res."\n";
+
+		if($res != "0E0")
+		{
+			$dbh->do("SET session foreign_key_checks = 1;");
+			print $_." truncate: ".$dbh->strerr."\n";
+			return 4; 
+		}
+	}
+
+	$dbh->do("SET session foreign_key_checks = 1;");
+
+	return 0;
 }
 
 1;
