@@ -6,12 +6,14 @@ BEGIN
 {
 	use Exporter ();
 	@ISA = qw(Exporter);
-	@EXPORT = qw(&check &clear &mysql_connect);
+	@EXPORT = qw(&check &clear &mysql_connect &create_user);
 }
 
-#db handler
+########## VARIABLES ##########
 $dbh = 0;
+######### /VARIABLES ##########
 
+########## COMMON FUNC ##########
 sub mysql_connect
 {
 	my $database = shift;
@@ -46,6 +48,7 @@ sub clear
 		my $query = $dbh->prepare("TRUNCATE TABLE `".$_."`;");
 		$res = $query->execute;
 		print $_.": ".$res."\n";
+		$query->finish;
 
 		if($res != "0E0")
 		{
@@ -59,6 +62,31 @@ sub clear
 
 	return 0;
 }
+
+######### /COMMON FUNC ##########
+########## USER FUNC ##########
+
+sub create_user #username, email, about = '', name = '',  is_anon = 0
+{
+	my $username = shift;
+	my $email = shift;
+
+	my $about = shift || '';
+	my $name = shift || '';
+	my $is_anon = shift || 0;
+
+	return 3 unless ($username and $email);
+
+	my $query = $dbh->prepare("INSERT INTO `user`(`username`, `email`, `about`, `name`, `isAnonymous`) VALUES('$username', '$email', '$about', '$name', $is_anon);");
+	my $res = $query->execute;
+
+	return 4 if ($res != 1);
+
+	$query->finish;
+	return 0;
+}
+
+######### /USER FUNC ##########
 
 1;
 

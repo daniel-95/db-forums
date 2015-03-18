@@ -9,7 +9,7 @@ get '/' => sub {
 	$c->render(text => 'Hello, World!');
 };
 
-get '/create_post' => sub {
+get '/check' => sub {
 	my $c = shift;
 	$c->render(text => check());
 };
@@ -17,6 +17,11 @@ get '/create_post' => sub {
 get '/db/api/clear' => sub {
 	my $c = shift;
 	$c->render(text => clear());
+};
+
+get '/db/api/user/create' => sub {
+	my $c = shift;
+	$c->render(text => create_user('username123', 'user777@mail.ru', 'about me', 'ivan'));
 };
 
 app->start;
