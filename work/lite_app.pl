@@ -1,5 +1,6 @@
 #!usr/bin/perl
 use Mojolicious::Lite;
+use Mojo::JSON qw(encode_json decode_json);
 use TechDBApi;
 
 mysql_connect('db_forums', 'root', 'root');
@@ -22,6 +23,11 @@ get '/db/api/clear' => sub {
 get '/db/api/user/create' => sub {
 	my $c = shift;
 	$c->render(text => create_user('username123', 'user777@mail.ru', 'about me', 'ivan'));
+};
+
+get '/db/api/forum/create' => sub {
+	my $c = shift;
+	$c->render(text => create_forum('Best Forum', 'bestforum', 1));
 };
 
 app->start;

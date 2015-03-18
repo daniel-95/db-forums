@@ -6,7 +6,7 @@ BEGIN
 {
 	use Exporter ();
 	@ISA = qw(Exporter);
-	@EXPORT = qw(&check &clear &mysql_connect &create_user);
+	@EXPORT = qw(&check &clear &mysql_connect &create_user &create_forum);
 }
 
 ########## VARIABLES ##########
@@ -66,7 +66,7 @@ sub clear
 ######### /COMMON FUNC ##########
 ########## USER FUNC ##########
 
-sub create_user #username, email, about = '', name = '',  is_anon = 0
+sub create_user # username, email, about = '', name = '',  is_anon = 0
 {
 	my $username = shift;
 	my $email = shift;
@@ -87,6 +87,27 @@ sub create_user #username, email, about = '', name = '',  is_anon = 0
 }
 
 ######### /USER FUNC ##########
+
+########## FORUM FUNC ##########
+
+sub create_forum # name, short_name, user_id
+{
+	my $name = shift;
+	my $short_name = shift;
+	my $user_id = shift;
+
+	return 3 unless ($name and $short_name and $user_id);
+
+	my $query = $dbh->prepare("INSERT INTO `forum`(`name`, `short_name`, `user_id`) VALUES('$name', '$short_name', $user_id);");
+	my $res = $query->execute;
+
+	return 4 if ($res != 1);
+
+	$query->finish;
+	return 0;
+}
+
+######### /FORUM FUNC ##########
 
 1;
 
