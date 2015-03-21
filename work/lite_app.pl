@@ -5,7 +5,8 @@ use TechDBApi;
 
 app->config(hypnotoad => {listen => ['http://*:3000']});
 
-mysql_connect('db_forums', 'root', 'root');
+my %conf_info = readConf("database.conf");
+mysql_connect($conf_info{database}, $conf_info{login}, $conf_info{password});
 
 get '/' => sub {
 	my $c = shift;
@@ -33,3 +34,32 @@ get '/db/api/forum/create' => sub {
 };
 
 app->start;
+
+##### FUNCTIONS #####
+
+sub readConf
+{
+	my $line;
+	my $key;
+	my $val;
+
+	my $conf_file = shift;
+	open(CONFIG, "< $conf_file") || die "No configuration file!";
+	my @data = <CONFIG>;
+	chomp(@data);
+
+	my %c = ();
+
+	for $line(@data)
+	{
+		($key, $val) = split('=', $line);
+		chomp($key);
+		chomp($val);
+
+		$c{$key} = $val;
+	}
+
+	close(CONFIG);
+
+	return %c;
+}
