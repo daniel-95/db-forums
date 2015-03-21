@@ -3,6 +3,8 @@ use Mojolicious::Lite;
 use Mojo::JSON qw(encode_json decode_json);
 use TechDBApi;
 
+app->config(hypnotoad => {listen => ['http://*:3000']});
+
 mysql_connect('db_forums', 'root', 'root');
 
 get '/' => sub {
