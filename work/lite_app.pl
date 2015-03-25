@@ -1,9 +1,7 @@
 #!usr/bin/perl
 use Mojolicious::Lite;
-use Mojo::JSON qw(encode_json decode_json);
+use Mojo::JSON qw(decode_json);
 use TechDBApi;
-
-app->config(hypnotoad => {listen => ['http://*:3000']});
 
 my %conf_info = readConf("database.conf");
 mysql_connect($conf_info{database}, $conf_info{login}, $conf_info{password});
@@ -13,9 +11,9 @@ get '/' => sub {
 	$c->render(text => 'Hello, World!');
 };
 
-get '/check' => sub {
+get '/db/api/status' => sub {
 	my $c = shift;
-	$c->render(text => check());
+	$c->render(text => status());
 };
 
 get '/db/api/clear' => sub {
@@ -26,6 +24,11 @@ get '/db/api/clear' => sub {
 get '/db/api/user/create' => sub {
 	my $c = shift;
 	$c->render(text => create_user('username123', 'user777@mail.ru', 'about me', 'ivan'));
+};
+
+get '/db/api/user/details' => sub {
+	my $c = shift;
+	$c->render(text => user_details('user777@mail.ru'));
 };
 
 get '/db/api/forum/create' => sub {

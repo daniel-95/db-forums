@@ -1,12 +1,13 @@
 #!usr/bin/perl
 package TechDBApi;
+use Mojo::JSON qw(encode_json);
 use DBI;
 
 BEGIN
 {
 	use Exporter ();
 	@ISA = qw(Exporter);
-	@EXPORT = qw(&check &clear &mysql_connect &create_user &create_forum);
+	@EXPORT = qw(&status &clear &mysql_connect &create_user &create_forum &user_details);
 }
 
 ########## VARIABLES ##########
@@ -23,24 +24,34 @@ sub mysql_connect
 	$dbh = DBI->connect("DBI:mysql:$database", $user, $password);
 }
 
-sub check 
+sub status 
 {
-	my $query = $dbh->prepare("select count(*) from user;");
-	$query->execute;
-	my $result = "";
+	@tables = qw(user forum thread post);
+	my $result = {code => "", response => ""};
+	my $response = {};
+	my $k, $v;
 
-	while(my @data = $query->fetchrow_array)
+	foreach(@tables)
 	{
-		$result .= join(", ", @data);
+		my $query = $dbh->prepare("SELECT count(*) from $_;");
+		$res = $query->execute;
+		my @data = $query->fetchrow_array;
+		$data_ref->{$_} = $data[0];
 	}
 
-	$query->finish;
-	return $result;
+	$result->{code} = 0;
+	$result->{response} = $data_ref;
+
+	return encode_json($result);
 }
 
 sub clear
 {
-	@tables = qw(user forum thread post subscription follow);
+	my $result = {code => "", response => ""};
+	my $response = {};
+	$code = 0;
+	my @tables = qw(user forum thread post subscription follow);
+
 	$dbh->do("SET session foreign_key_checks = 0;");
 
 	foreach(@tables)
@@ -52,15 +63,16 @@ sub clear
 
 		if($res != "0E0")
 		{
-			$dbh->do("SET session foreign_key_checks = 1;");
 			print $_." truncate: ".$dbh->strerr."\n";
-			return 4; 
+			$code = 4;
+			last;
 		}
 	}
 
 	$dbh->do("SET session foreign_key_checks = 1;");
 
-	return 0;
+	$result->{code} = $code;
+	return encode_json($result);
 }
 
 ######### /COMMON FUNC ##########
@@ -84,6 +96,56 @@ sub create_user # username, email, about = '', name = '',  is_anon = 0
 
 	$query->finish;
 	return 0;
+}
+
+sub user_details
+{
+	my $result = {code => "", response => ""};
+	my $response = {};
+	my $followee_ref = [];
+	my $following_ref = [];
+	$code = 0;
+
+	my $email = shift;
+	my $query = $dbh->prepare("select email, about, isAnonymous, id, name, username FROM user WHERE email = '$email';");
+	$res = $query->execute;
+	$response = $query->fetchrow_hashref;
+	$query->finish;
+
+	$result->{response} = $response;
+	$result->{code} = 0;
+
+	return encode_json($result);
+}
+
+sub user_follow
+{
+
+}
+
+sub user_unfollow
+{
+
+}
+
+sub user_list_followers
+{
+
+}
+
+sub user_list_following
+{
+
+}
+
+sub user_list_posts
+{
+
+}
+
+sub user_update
+{
+
 }
 
 ######### /USER FUNC ##########
