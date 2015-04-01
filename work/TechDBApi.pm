@@ -1,13 +1,12 @@
 #!usr/bin/perl
 package TechDBApi;
-use Mojo::JSON qw(encode_json);
 use DBI;
 
 BEGIN
 {
 	use Exporter ();
 	@ISA = qw(Exporter);
-	@EXPORT = qw(&status &clear &mysql_connect &create_user &create_forum &user_details);
+	@EXPORT = qw(&status &clear &mysql_connect &create_user &create_forum &user_details &user_list_follow &get_id_by_email);
 }
 
 ########## VARIABLES ##########
@@ -38,11 +37,12 @@ sub status
 		my @data = $query->fetchrow_array;
 		$data_ref->{$_} = $data[0];
 	}
+	$query->finish;
 
 	$result->{code} = 0;
 	$result->{response} = $data_ref;
 
-	return encode_json($result);
+	$result;
 }
 
 sub clear
@@ -72,7 +72,7 @@ sub clear
 	$dbh->do("SET session foreign_key_checks = 1;");
 
 	$result->{code} = $code;
-	return encode_json($result);
+	return $result;
 }
 
 sub get_id_by_email
@@ -81,7 +81,9 @@ sub get_id_by_email
 
 	$query = $dbh->prepare("select id from user where email = '$email';");
 	$res = $query->execute;
-	$data = $query->fetchrow_array;
+	@data = $query->fetchrow_array;
+	$query->finish;
+
 	return $data[0];
 }
 
@@ -91,11 +93,14 @@ sub get_email_by_id
 
 	$query = $dbh->prepare("select email from user where id = $id;");
 	$res = $query->execute;
-	$data = $query->fetchrow_array;
+	@data = $query->fetchrow_array;
+	$query->finish;
+
 	return $data[0];
 }
 
 ######### /COMMON FUNC ##########
+
 ########## USER FUNC ##########
 
 sub create_user # username, email, about = '', name = '',  is_anon = 0
@@ -138,27 +143,36 @@ sub user_details
 
 	#followers
 	my $query = $dbh->prepare("SELECT follower_id FROM follow WHERE followee_id = $user_id;");
-	$fol_id = $query->fetchrow_array;
+	$res = $query->execute;
 
 	while($fol_id = $query->fetchrow_array)
 	{
 		push @$follower_ref, get_email_by_id($fol_id); 
 	}
 
+	$query->finish;
+
 	#followees
 	my $query = $dbh->prepare("SELECT followee_id FROM follow WHERE follower_id = $user_id;");
+	$res = $query->execute;
 
 	while($fol_id = $query->fetchrow_array)
 	{
 		push @$followee_ref, get_email_by_id($fol_id); 
 	}
 
+	$query->finish;
+
 	#subscriptions
 	my $query = $dbh->prepare("SELECT thread_id FROM subscription WHERE user_id = $user_id;");
+	$res = $query->execute;
+
 	while($sub_id = $query->fetchrow_array)
 	{
 		push @$subscr_ref, $sub_id; 
 	}
+
+	$query->finish;
 
 	$response->{followers} = $followee_ref;
 	$response->{following} = $following_ref;
@@ -166,7 +180,7 @@ sub user_details
 	$result->{response} = $response;
 	$result->{code} = 0;
 
-	return encode_json($result);
+	return $result;
 }
 
 sub user_follow
@@ -179,6 +193,8 @@ sub user_follow
 
 	$query = $dbh->prepare("INSERT INTO follow (follower_id, followee_id) VALUES ($user_id1, $user_id2);");
 	$res = $query->execute;
+	$query->finish;
+
 	return user_details($email1);
 }
 
@@ -192,17 +208,43 @@ sub user_unfollow
 
 	$query = $dbh->prepare("DELETE FROM follow where follower_id = $user_id1 and followee_id = $user_id2;");
 	$res = $query->execute;
+	$query->finish;
+
 	return user_details($email1);
 }
 
-sub user_list_followers
+sub user_list_follow #type = follower/followee, email, %params {since_id = undef, order = ASC/DESC, limit} 
 {
-	
-}
+	my $type = shift;
+	my $email = shift;
+	my $params = shift;
+	my $result = {code => "", response => ""};
+	my $id = get_id_by_email($email) || undef;
+	my $ids = [];
 
-sub user_list_following
-{
-	
+	$params->{order} = "DESC" unless defined $params->{order};
+
+	my $where = $type eq "follower" ? "followee" : "follower";
+
+	my $query_str = "SELECT u.email from follow f JOIN user u on u.id = f.$type"."_id"." where $where"."_id"." = $id";
+
+	$query_str .= " and $type"."_id >= $params->{since_id}" if defined $params->{since_id};
+	$query_str .= " order by u.name $params->{order}";
+	$query_str .= " LIMIT $params->{limit}" if defined $params->{limit};
+
+	$query_str .= ";";
+
+	my $query = $dbh->prepare($query_str);
+	$res = $query->execute;
+
+	while($fol_id = $query->fetchrow_array)
+	{
+		push @$ids, user_details($fol_id);
+	}
+	$result->{code} = 0;
+	$result->{response} = $ids;
+
+	return $result;
 }
 
 sub user_list_posts
