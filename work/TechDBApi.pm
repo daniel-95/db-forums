@@ -124,8 +124,10 @@ sub user_details
 	my $response = {};
 	my $followee_ref = [];
 	my $following_ref = [];
+	my $subscr_ref = [];
 	$code = 0;
 
+	#main info
 	my $email = shift;
 	my $query = $dbh->prepare("select email, about, isAnonymous, id, name, username FROM user WHERE email = '$email';");
 	$res = $query->execute;
@@ -134,24 +136,33 @@ sub user_details
 
 	my $user_id = get_id_by_email($email);
 
+	#followers
 	my $query = $dbh->prepare("SELECT follower_id FROM follow WHERE followee_id = $user_id;");
 	$fol_id = $query->fetchrow_array;
 
-	foreach $id(fol_id)
+	while($fol_id = $query->fetchrow_array)
 	{
-		push @$follower_ref, get_email_by_id($id); 
+		push @$follower_ref, get_email_by_id($fol_id); 
 	}
 
+	#followees
 	my $query = $dbh->prepare("SELECT followee_id FROM follow WHERE follower_id = $user_id;");
-	$fol_id = $query->fetchrow_array;
 
-	foreach $id(fol_id)
+	while($fol_id = $query->fetchrow_array)
 	{
-		push @$followee_ref, get_email_by_id($id); 
+		push @$followee_ref, get_email_by_id($fol_id); 
+	}
+
+	#subscriptions
+	my $query = $dbh->prepare("SELECT thread_id FROM subscription WHERE user_id = $user_id;");
+	while($sub_id = $query->fetchrow_array)
+	{
+		push @$subscr_ref, $sub_id; 
 	}
 
 	$response->{followers} = $followee_ref;
 	$response->{following} = $following_ref;
+	$response->{subscriptions} = $subscr_ref;
 	$result->{response} = $response;
 	$result->{code} = 0;
 
@@ -160,32 +171,48 @@ sub user_details
 
 sub user_follow
 {
-	
+	my $user_id1 = shift;
+	my $user_id2 = shift;
+
+	my $email1 = get_email_by_id($user_id1);
+	my $email2 = get_email_by_id($user_id2);
+
+	$query = $dbh->prepare("INSERT INTO follow (follower_id, followee_id) VALUES ($user_id1, $user_id2);");
+	$res = $query->execute;
+	return user_details($email1);
 }
 
 sub user_unfollow
 {
+	my $user_id1 = shift;
+	my $user_id2 = shift;
 
+	my $email1 = get_email_by_id($user_id1);
+	my $email2 = get_email_by_id($user_id2);
+
+	$query = $dbh->prepare("DELETE FROM follow where follower_id = $user_id1 and followee_id = $user_id2;");
+	$res = $query->execute;
+	return user_details($email1);
 }
 
 sub user_list_followers
 {
-
+	
 }
 
 sub user_list_following
 {
-
+	
 }
 
 sub user_list_posts
 {
-
+	
 }
 
 sub user_update
 {
-
+	
 }
 
 ######### /USER FUNC ##########
