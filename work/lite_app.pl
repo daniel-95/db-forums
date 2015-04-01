@@ -1,6 +1,6 @@
 #!usr/bin/perl
 use Mojolicious::Lite;
-use Mojo::JSON qw(decode_json);
+use Mojo::JSON qw(encode_json decode_json);
 use TechDBApi;
 
 my %conf_info = readConf("database.conf");
@@ -8,7 +8,7 @@ mysql_connect($conf_info{database}, $conf_info{login}, $conf_info{password});
 
 get '/' => sub {
 	my $c = shift;
-	$c->render(text => 'Hello, World!');
+	$c->render(text => '');
 };
 
 get '/db/api/status' => sub {

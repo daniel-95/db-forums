@@ -75,6 +75,26 @@ sub clear
 	return encode_json($result);
 }
 
+sub get_id_by_email
+{
+	my $email = shift;
+
+	$query = $dbh->prepare("select id from user where email = '$email';");
+	$res = $query->execute;
+	$data = $query->fetchrow_array;
+	return $data[0];
+}
+
+sub get_email_by_id
+{
+	my $id = shift;
+
+	$query = $dbh->prepare("select email from user where id = $id;");
+	$res = $query->execute;
+	$data = $query->fetchrow_array;
+	return $data[0];
+}
+
 ######### /COMMON FUNC ##########
 ########## USER FUNC ##########
 
@@ -112,6 +132,26 @@ sub user_details
 	$response = $query->fetchrow_hashref;
 	$query->finish;
 
+	my $user_id = get_id_by_email($email);
+
+	my $query = $dbh->prepare("SELECT follower_id FROM follow WHERE followee_id = $user_id;");
+	$fol_id = $query->fetchrow_array;
+
+	foreach $id(fol_id)
+	{
+		push @$follower_ref, get_email_by_id($id); 
+	}
+
+	my $query = $dbh->prepare("SELECT followee_id FROM follow WHERE follower_id = $user_id;");
+	$fol_id = $query->fetchrow_array;
+
+	foreach $id(fol_id)
+	{
+		push @$followee_ref, get_email_by_id($id); 
+	}
+
+	$response->{followers} = $followee_ref;
+	$response->{following} = $following_ref;
 	$result->{response} = $response;
 	$result->{code} = 0;
 
@@ -120,7 +160,7 @@ sub user_details
 
 sub user_follow
 {
-
+	
 }
 
 sub user_unfollow
