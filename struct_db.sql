@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 5.5.41, for debian-linux-gnu (x86_64)
+-- MySQL dump 10.13  Distrib 5.5.43, for debian-linux-gnu (i686)
 --
 -- Host: localhost    Database: db_forums
 -- ------------------------------------------------------
--- Server version	5.5.41-0+wheezy1
+-- Server version	5.5.43-0ubuntu0.14.04.1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -32,6 +32,15 @@ CREATE TABLE `follow` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `follow`
+--
+
+LOCK TABLES `follow` WRITE;
+/*!40000 ALTER TABLE `follow` DISABLE KEYS */;
+/*!40000 ALTER TABLE `follow` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `forum`
 --
 
@@ -52,6 +61,15 @@ CREATE TABLE `forum` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `forum`
+--
+
+LOCK TABLES `forum` WRITE;
+/*!40000 ALTER TABLE `forum` DISABLE KEYS */;
+/*!40000 ALTER TABLE `forum` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `post`
 --
 
@@ -63,27 +81,36 @@ CREATE TABLE `post` (
   `message` text NOT NULL,
   `date` datetime NOT NULL,
   `thread_id` int(10) unsigned NOT NULL,
-  `user_id` int(10) unsigned NOT NULL,
+  `user` varchar(255) NOT NULL,
   `parent_id` int(10) unsigned DEFAULT NULL,
   `is_approved` tinyint(1) NOT NULL DEFAULT '0',
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
   `is_edited` tinyint(1) NOT NULL DEFAULT '0',
   `is_spam` tinyint(1) NOT NULL DEFAULT '0',
   `is_highlighted` tinyint(1) NOT NULL DEFAULT '0',
-  `forum_id` int(10) unsigned NOT NULL,
+  `forum` varchar(128) NOT NULL,
   `likes` int(10) unsigned NOT NULL DEFAULT '0',
   `dislikes` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `user_date` (`user_id`,`date`),
   UNIQUE KEY `thread_date` (`thread_id`,`date`),
+  UNIQUE KEY `user_date` (`user`,`date`),
   KEY `parent_id` (`parent_id`),
-  KEY `forum_id` (`forum_id`),
+  KEY `forum` (`forum`),
   CONSTRAINT `post_ibfk_1` FOREIGN KEY (`thread_id`) REFERENCES `thread` (`id`),
   CONSTRAINT `post_ibfk_2` FOREIGN KEY (`parent_id`) REFERENCES `post` (`id`),
-  CONSTRAINT `post_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`),
-  CONSTRAINT `post_ibfk_4` FOREIGN KEY (`forum_id`) REFERENCES `forum` (`id`)
+  CONSTRAINT `post_ibfk_3` FOREIGN KEY (`user`) REFERENCES `user` (`email`),
+  CONSTRAINT `post_ibfk_4` FOREIGN KEY (`forum`) REFERENCES `forum` (`short_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `post`
+--
+
+LOCK TABLES `post` WRITE;
+/*!40000 ALTER TABLE `post` DISABLE KEYS */;
+/*!40000 ALTER TABLE `post` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `subscription`
@@ -96,10 +123,18 @@ CREATE TABLE `subscription` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `user_id` int(10) unsigned NOT NULL,
   `thread_id` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `user_thread` (`user_id`,`thread_id`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `subscription`
+--
+
+LOCK TABLES `subscription` WRITE;
+/*!40000 ALTER TABLE `subscription` DISABLE KEYS */;
+/*!40000 ALTER TABLE `subscription` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `thread`
@@ -113,8 +148,8 @@ CREATE TABLE `thread` (
   `title` varchar(128) NOT NULL,
   `date` datetime NOT NULL,
   `message` text NOT NULL,
-  `forum_id` int(10) unsigned NOT NULL,
-  `user_id` int(10) unsigned NOT NULL,
+  `forum` varchar(255) DEFAULT NULL,
+  `user` varchar(255) DEFAULT NULL,
   `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
   `is_closed` tinyint(1) NOT NULL DEFAULT '0',
   `slug` varchar(64) NOT NULL,
@@ -123,12 +158,21 @@ CREATE TABLE `thread` (
   `posts` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `title` (`title`),
-  KEY `forum_id` (`forum_id`),
-  KEY `user_id` (`user_id`),
-  CONSTRAINT `thread_ibfk_1` FOREIGN KEY (`forum_id`) REFERENCES `forum` (`id`),
-  CONSTRAINT `thread_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
+  KEY `forum_id` (`forum`),
+  KEY `user_id` (`user`),
+  CONSTRAINT `fk_forum_short` FOREIGN KEY (`forum`) REFERENCES `forum` (`short_name`),
+  CONSTRAINT `fk_name` FOREIGN KEY (`user`) REFERENCES `user` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `thread`
+--
+
+LOCK TABLES `thread` WRITE;
+/*!40000 ALTER TABLE `thread` DISABLE KEYS */;
+/*!40000 ALTER TABLE `thread` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `user`
@@ -148,6 +192,15 @@ CREATE TABLE `user` (
   UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `user`
+--
+
+LOCK TABLES `user` WRITE;
+/*!40000 ALTER TABLE `user` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user` ENABLE KEYS */;
+UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -158,4 +211,4 @@ CREATE TABLE `user` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2015-03-16 21:01:39
+-- Dump completed on 2015-04-30 22:42:14
