@@ -7,9 +7,41 @@ BEGIN
 {
 	use Exporter ();
 	@ISA = qw(Exporter);
-	@EXPORT = qw(&status &clear &mysql_connect &create_user &create_forum &user_details &user_list_follow &get_id_by_email
-				&forum_details &create_thread &thread_details &create_post &post_details &post_list &post_remove &post_restore 
-				&post_update &post_vote &thread_list &thread_list_posts &thread_remove &thread_restore &thread_close);
+	@EXPORT = qw(&status 
+				 &clear 
+
+				 &mysql_connect 
+
+				 &create_user 
+				 &user_details
+				 &user_list_posts
+				 &user_update_profile
+				 &user_follow
+
+				 &create_forum 
+				 &forum_details 
+
+				 &create_thread 
+				 &thread_details
+				 &thread_list 
+				 &thread_list_posts 
+				 &thread_remove 
+				 &thread_restore 
+				 &thread_close 
+				 &thread_open
+				 &thread_update
+				 &thread_vote
+				 &thread_subscribe
+				 &thread_unsubscribe
+
+				 &create_post 
+				 &post_details 
+				 &post_list 
+				 &post_remove 
+				 &post_restore 
+				 &post_update 
+				 &post_vote 
+				);
 }
 
 ########## VARIABLES ##########
@@ -160,6 +192,10 @@ sub change_posts_count {
 	return 1;
 }
 
+sub do_request {
+
+}
+
 sub in_array {
   grep {$_ eq $_[0]} @{$_[1]};
 }
@@ -214,7 +250,7 @@ sub user_details
 	my $result = {code => 0, response => {}};
 	my $response = {};
 	my $followee_ref = [];
-	my $following_ref = [];
+	my $follower_ref = [];
 	my $subscr_ref = [];
 
 	#main info
@@ -223,8 +259,8 @@ sub user_details
 	$res = $query->execute;
 	$response = $query->fetchrow_hashref;
 	$response->{isAnonymous} = $response->{isAnonymous} eq "0" ? Mojo::JSON->false : Mojo::JSON->true;
-	for(keys %$response)
-	{
+
+	for(keys %$response) {
 		$response->{$_} = undef if($response->{$_} eq "");
 	}
 
@@ -232,7 +268,7 @@ sub user_details
 	$query->finish;
 
 	my $user_id = get_id_by_email($email);
-	my $query = $dbh->prepare("SELECT follower_id FROM follow WHERE followee_id = $user_id;");
+	my $query = $dbh->prepare("SELECT follower FROM follow WHERE followee = '$email';");
 
 	#followers
 	if($user_id > 0)
@@ -253,37 +289,37 @@ sub user_details
 		return $result;
 	}
 
-	while($fol_id = $query->fetchrow_array)
+	while(($fol_id) = $query->fetchrow_array)
 	{
-		push @$follower_ref, get_email_by_id($fol_id); 
+		push @$follower_ref, $fol_id; 
 	}
 
 	$query->finish;
 
 	#followees
-	my $query = $dbh->prepare("SELECT followee_id FROM follow WHERE follower_id = $user_id;");
+	my $query = $dbh->prepare("SELECT followee FROM follow WHERE follower = '$email';");
 	$res = $query->execute;
 
-	while($fol_id = $query->fetchrow_array)
+	while(($fol_id) = $query->fetchrow_array)
 	{
-		push @$followee_ref, get_email_by_id($fol_id); 
+		push @$followee_ref, $fol_id; 
 	}
 
 	$query->finish;
 
 	#subscriptions
-	my $query = $dbh->prepare("SELECT thread_id FROM subscription WHERE user_id = $user_id;");
+	my $query = $dbh->prepare("SELECT thread_id FROM subscription WHERE user = '$email';");
 	$res = $query->execute;
 
 	while($sub_id = $query->fetchrow_array)
 	{
-		push @$subscr_ref, $sub_id; 
+		push @$subscr_ref, ($sub_id + 0); 
 	}
 
 	$query->finish;
 
-	$response->{followers} = $followee_ref;
-	$response->{following} = $following_ref;
+	$response->{followers} = $follower_ref;
+	$response->{following} = $followee_ref;
 	$response->{subscriptions} = $subscr_ref;
 	$result->{response} = $response;
 	$result->{code} = 0;
@@ -291,19 +327,15 @@ sub user_details
 	return $result;
 }
 
-sub user_follow
-{
-	my $user_id1 = shift;
-	my $user_id2 = shift;
+sub user_follow {
+	my $follower = shift;
+	my $followee = shift;
 
-	my $email1 = get_email_by_id($user_id1);
-	my $email2 = get_email_by_id($user_id2);
-
-	$query = $dbh->prepare("INSERT INTO follow (follower_id, followee_id) VALUES ($user_id1, $user_id2);");
+	$query = $dbh->prepare("INSERT INTO follow (follower, followee) VALUES ('$follower', '$followee');");
 	$res = $query->execute;
 	$query->finish;
 
-	return user_details($email1);
+	return user_details($follower);
 }
 
 sub user_unfollow
@@ -355,14 +387,70 @@ sub user_list_follow #type = follower/followee, email, %params {since_id = undef
 	return $result;
 }
 
-sub user_list_posts
-{
+sub user_list_posts { # user [, since, order, limit]
+	my $user = shift;
+	my $optional = shift || {};
 
+	my $count = 0;
+	my $order = "desc";
+	my $base_ref = {};
+	my $array_posts = [];
+	my $result = {code => 4, response => {}};
+	my $query_string = "select id from post where user = '$user'";
+
+	if(defined $optional->{since}) {
+		$query_string .= " and date >= '$optional->{since}'";
+	}
+
+	$query_string .= " order by date $optional->{order}";
+
+	if(defined $optional->{limit}) {
+		$query_string .= " limit $optional->{limit}";
+	}
+
+	$query_string .= ";";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@)
+	{
+		return $result;
+	}
+
+	$result->{code} = 0;
+
+	while($base_ref = $query->fetchrow_hashref) {
+		$base_ref = post_details($base_ref->{id});
+		push @$array_posts, $base_ref->{response};
+	}
+
+	$result->{response} = $array_posts;
+	return $result;
 }
 
-sub user_update
-{
-	
+sub user_update_profile { # user, name, about
+	my $user = shift;	# user email
+	my $name = shift;	# user name
+	my $about = shift;	# some info about user
+
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "update user set name = '$name', about = '$about' where email = '$user';";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	$result = user_details($user);
+	$query->finish;
+
+	return $result;
 }
 
 ######### /USER FUNC ##########
@@ -414,8 +502,9 @@ sub forum_details #short_name, [related]
 
 	my $short_name = shift;
 	my $related = shift || "";
+	my $query_string = "select * from forum where short_name = '$short_name';";
 
-	my $query = $dbh->prepare("select * from forum where short_name = '$short_name';");
+	my $query = $dbh->prepare($query_string);
 	eval {
 		$res = $query->execute;
 	};
@@ -851,6 +940,7 @@ sub thread_details #id, [, related(user, forum)]
 	$base_ref->{likes} += 0;
 	$base_ref->{dislikes} += 0;
 
+	$base_ref->{points} = $base_ref->{likes} - $base_ref->{dislikes};
 	$base_ref->{posts} += 0;
 	$base_ref->{id}  = $id + 0;
 
@@ -1055,26 +1145,139 @@ sub thread_restore {
 	return $result;
 }
 
-#sub thread_close {
-#	my $id = shift;
-#	my $result = {code => 4, response => {}};
+sub thread_close {
+	my $id = shift;
+	my $result = {code => 4, response => {}};
 
-#	my $query_string = "update thread set is_closed = 1 where id = $id;";
+	my $query_string = "update thread set is_closed = 1 where id = $id;";
 
-#	my $query = $dbh->prepare($query_string);
-#	eval {
-#		$res = $query->execute;
-#	};
-#	if($@) {
-#		return $result;
-#	}
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
 
-#	$result->{code} = 0;
-#	$result->{response} = { post => $id };
+	$result->{code} = 0;
+	$result->{response} = { post => $id };
 
 
-#	return $result;
-#}
+	return $result;
+}
+
+sub thread_open {
+	my $id = shift;
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "update thread set is_closed = 0 where id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	$result->{code} = 0;
+	$result->{response} = { post => $id };
+
+
+	return $result;
+}
+
+sub thread_update {
+	my $id = shift;
+	my $message = shift;
+	my $slug = shift;
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "update thread set message = '$message', slug = '$slug' where id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	$result = thread_details($id);
+	$query->finish;
+
+	return $result;
+}
+
+sub thread_vote { # id, vote
+	my $id = shift;
+	my $vote = shift;
+	my $result = {code => 4, response => {}};
+	my $entity = "likes";
+
+	if($vote == -1) {
+		$entity = "dislikes";
+	}
+
+	my $query_string = "update thread set $entity = $entity + 1 where id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	$result = thread_details($id);
+	$query->finish;
+
+	return $result;
+}
+
+sub thread_subscribe { # id, user
+	my $id = shift;
+	my $user = shift;
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "insert into subscription(user, thread_id) "
+						."values('$user', $id);";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+	$query->finish;
+
+	$result->{response} = { thread => $id, user => $user };
+
+	return $result;
+}
+
+sub thread_unsubscribe { # id, user
+	my $id = shift;
+	my $user = shift;
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "delete from subscription "
+						."where user = '$user' and thread_id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+	$query->finish;
+
+	$result->{response} = { thread => $id, user => $user };
+
+	return $result;
+}
 
 ######### /THREAD FUNC #########
 1;

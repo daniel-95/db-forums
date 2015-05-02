@@ -72,6 +72,86 @@ get '/db/api/user/listFollowing' => sub {
 	$c->render(text => to_json(user_list_follow('followee', 'user777@mail.ru', \%params)));
 };
 
+get 'db/api/user/listPosts' => sub {
+	my $c = shift;
+	my $order = "desc";
+	my $answer = {code => 0, response => {}};
+	my %optional = (since => undef, limit => undef, order => "desc");
+
+	my $user = $c->param("user");
+
+	unless(defined $user) {
+		$answer->{code} = 3;
+	}
+
+	$optional{since} = $c->param("since");
+	$optional{limit} = $c->param("limit");
+
+	if(defined $c->param("order")) {
+		$order = $c->param("order");
+
+		if(lc $order ne "asc" && lc $order ne "desc") {
+			$answer->{code} = 3;
+		} else {
+			$optional{order} = $order;
+		}
+	}
+
+	if($answer->{code} == 0) {
+		$answer = user_list_posts($user, \%optional);
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/user/updateProfile' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{about} && defined $json_data->{user} && defined $json_data->{name}) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = user_update_profile($json_data->{user}, $json_data->{name}, $json_data->{about});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/user/follow' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{follower} && defined $json_data->{followee}) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = user_follow($json_data->{follower}, $json_data->{followee});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
 ########## FORUM ##########
 
 post '/db/api/forum/create' => sub {
@@ -303,6 +383,141 @@ post 'db/api/thread/close' => sub {
 
 	if($answer->{code} == 0) {
 		$answer = thread_close($json_data->{thread});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/thread/open' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{thread} && $json_data->{thread} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_open($json_data->{thread});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/thread/update' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{thread} && $json_data->{thread} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+	unless(defined $json_data->{message} && defined $json_data->{slug}) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_update($json_data->{thread}, $json_data->{message}, $json_data->{slug});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post '/db/api/thread/vote' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{thread} && $json_data->{thread} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	unless(defined $json_data->{vote} && $json_data->{vote} =~ m/-?1/) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_vote($json_data->{thread}, $json_data->{vote});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/thread/subscribe' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{thread} && $json_data->{thread} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	unless(defined $json_data->{user}) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_subscribe($json_data->{thread}, $json_data->{user});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/thread/unsubscribe' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{thread} && $json_data->{thread} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	unless(defined $json_data->{user}) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_unsubscribe($json_data->{thread}, $json_data->{user});
 	}
 
 	$c->render(text => to_json($answer));
