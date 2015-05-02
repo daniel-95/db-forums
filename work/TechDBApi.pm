@@ -7,7 +7,9 @@ BEGIN
 {
 	use Exporter ();
 	@ISA = qw(Exporter);
-	@EXPORT = qw(&status &clear &mysql_connect &create_user &create_forum &user_details &user_list_follow &get_id_by_email &forum_details &create_thread &thread_details &create_post &post_details);
+	@EXPORT = qw(&status &clear &mysql_connect &create_user &create_forum &user_details &user_list_follow &get_id_by_email
+				&forum_details &create_thread &thread_details &create_post &post_details &post_list &post_remove &post_restore 
+				&post_update &post_vote &thread_list &thread_list_posts &thread_remove &thread_restore &thread_close);
 }
 
 ########## VARIABLES ##########
@@ -120,6 +122,42 @@ sub get_id_by_entity {
 	$query->finish;
 
 	return $data[0];
+}
+
+sub change_posts_count {
+	my $post_id = shift;
+	my $action = shift;
+	my $sign = "+";
+	my $res = undef;
+
+	if($action eq "inc") {
+		$sign = "+";
+	} elsif($action eq "dec") {
+		$sign = "-";
+	} else {
+		return -1;
+	}
+	my $query_string = "select thread_id from post where id = $post_id;";
+	print "===debug change count(select): ".$query_string."\n";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return -1;
+	}
+
+	@data = $query->fetchrow_array;
+
+	$query_string = "update thread set posts = posts $sign 1 where id = $data[0];";
+	print "===debug change count(update): ".$query_string."\n";
+	$query = $dbh->prepare($query_string);
+	$res = $query->execute;
+
+	$query->finish;
+
+	return 1;
 }
 
 sub in_array {
@@ -439,7 +477,7 @@ sub create_post # date, thread_id, message, user, forum_short, [options]
 						."(`message`, `date`, `thread_id`, `user`, `forum`, `is_deleted`, `is_approved`, `is_highlighted`, `is_spam`, `is_edited`, `parent_id`) "
 						."VALUES('$message', '$date', $thread_id, '$user', '$forum_short', $options->{isDeleted}, $options->{isApproved}, "
 						."$options->{isHighlighted}, $options->{isSpam}, $options->{isEdited}, $parent);";
-	print "===debug output: ".$query_string."\n";
+
 	my $query = $dbh->prepare($query_string);
 
 	my $res = $query->execute;
@@ -451,6 +489,9 @@ sub create_post # date, thread_id, message, user, forum_short, [options]
 	else
 	{
 		$result->{code} = 0;
+		my $post_id = get_id_by_entity("post") + 0;
+
+		change_posts_count($post_id, "inc");
 
 		my $response->{date} = $date;
 		$response->{message} = $message;
@@ -463,7 +504,7 @@ sub create_post # date, thread_id, message, user, forum_short, [options]
 		$response->{isSpam} = $options->{isSpam};
 		$response->{parent} = $options->{parent} + 0;
 		$response->{thread} = $thread_id + 0;
-		$response->{id} = get_id_by_entity("post") + 0;
+		$response->{id} = $post_id;
 
 		$result->{response} = $response;
 	}
@@ -513,7 +554,7 @@ sub post_details # id [, related(user, forum, thread)]
 
 	if(in_array("thread", $related))
 	{
-		$details_ref = thread_details($base_ref->{thread});
+		$details_ref = thread_details($base_ref->{thread_id});
 		$base_ref->{thread} = $details_ref->{response};
 	}
 
@@ -525,7 +566,7 @@ sub post_details # id [, related(user, forum, thread)]
 	
 	$base_ref->{likes} += 0;
 	$base_ref->{dislikes} += 0;
-	$base_ref->{points} += 0;
+	$base_ref->{points} = $base_ref->{likes} - $base_ref->{dislikes};
 	$base_ref->{parent} = delete $base_ref->{parent_id};
 	$base_ref->{parent} += 0 if(defined $base_ref->{parent});
 	$base_ref->{thread} = delete $base_ref->{thread_id};
@@ -534,6 +575,170 @@ sub post_details # id [, related(user, forum, thread)]
 
 	$result->{code} = 0;
 	$result->{response} = $base_ref;
+
+	return $result;
+}
+
+sub post_list {	# entity, param [, since, limit, order]
+	my $entity = shift || undef;
+	my $param = shift || undef;
+	my $optional = shift || {};
+
+	my $count = 0;
+	my $base_ref = {};
+	my $array_posts = [];
+	my $result = {code => 4, response => {}};
+	my $query_string = "select id from post where $entity = $param";
+
+	if(defined $optional->{since}) {
+		$query_string .= " and date >= '$optional->{since}'";
+	}
+
+	$query_string .= " order by date $optional->{order}";
+
+	if(defined $optional->{limit}) {
+		$query_string .= " limit $optional->{limit}";
+	}
+
+	$query_string .= ";";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@)
+	{
+		return $result;
+	}
+
+	$result->{code} = 0;
+
+	while($base_ref = $query->fetchrow_hashref) {
+		$base_ref = post_details($base_ref->{id});
+		push @$array_posts, $base_ref->{response};
+	}
+
+	$result->{response} = $array_posts;
+	return $result;
+}
+
+sub post_remove { # id
+	my $id = shift;
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "select is_deleted from post where id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	my ($is_del) = $query->fetchrow_array;
+	$query->finish;
+
+	if($is_del == 0) {
+		$query_string = "update post set is_deleted = 1 where id = $id;";
+
+		$query = $dbh->prepare($query_string);
+		eval {
+			$res = $query->execute;
+		};
+		if($@) {
+			return $result;
+		}
+		change_posts_count($id, "dec");
+	}
+
+	$result->{code} = 0;
+	$result->{response} = { post => $id };
+	$query->finish;
+
+	return $result;
+}
+
+sub post_restore { # id
+	my $id = shift;
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "select is_deleted from post where id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	my ($is_del) = $query->fetchrow_array;
+	$query->finish;
+
+	if($is_del == 1) {
+		$query_string = "update post set is_deleted = 0 where id = $id;";
+
+		$query = $dbh->prepare($query_string);
+		eval {
+			$res = $query->execute;
+		};
+		if($@) {
+			return $result;
+		}
+		change_posts_count($id, "inc");
+	}
+
+	$result->{code} = 0;
+	$result->{response} = { post => $id };
+	$query->finish;
+
+	return $result;
+}
+
+sub post_update { # id, message
+	my $id = shift;
+	my $message = shift;
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "update post set message = '$message' where id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	$result = post_details($id);
+	$query->finish;
+
+	return $result;
+}
+
+sub post_vote { # id, vote
+	my $id = shift;
+	my $vote = shift;
+	my $result = {code => 4, response => {}};
+	my $entity = "likes";
+
+	if($vote == -1) {
+		$entity = "dislikes";
+	}
+
+	my $query_string = "update post set $entity = $entity + 1 where id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	$result = post_details($id);
+	$query->finish;
 
 	return $result;
 }
@@ -601,7 +806,6 @@ sub thread_details #id, [, related(user, forum)]
 
 	my $result = {code => 4, response => {}};
 	my $query_string = "select * from thread where id = $id;";
-	$query_string = "select * from thread order by id DESC limit 1;" if($id == -1);
 
 	my $query = $dbh->prepare($query_string);
 	eval {
@@ -622,10 +826,10 @@ sub thread_details #id, [, related(user, forum)]
 
 	my @rslt = grep {
   		my $t = $_;
-  		! grep { $_ eq $t } ("forum", "user"); # важно: для строк использовать eq
+  		! grep { $_ eq $t } ("forum", "user");
 	} @$related;
 
-	if(scalar keys @rslt > 0) {
+	if(scalar keys @rslt) {
 		$result->{code} = 3;
 		return $result;
 	}
@@ -646,6 +850,7 @@ sub thread_details #id, [, related(user, forum)]
 	$base_ref->{isClosed} = delete $base_ref->{is_closed} eq "0" ? Mojo::JSON->false : Mojo::JSON->true;
 	$base_ref->{likes} += 0;
 	$base_ref->{dislikes} += 0;
+
 	$base_ref->{posts} += 0;
 	$base_ref->{id}  = $id + 0;
 
@@ -654,6 +859,222 @@ sub thread_details #id, [, related(user, forum)]
 
 	return $result;
 }
+
+sub thread_list {	# entity, param [, since, limit, order]
+	my $entity = shift || undef;
+	my $param = shift || undef;
+	my $optional = shift || {};
+
+	my $count = 0;
+	my $base_ref = {};
+	my $array_threads = [];
+	my $result = {code => 4, response => {}};
+	my $query_string = "select id from thread where $entity = $param";
+
+	if(defined $optional->{since}) {
+		$query_string .= " and date >= '$optional->{since}'";
+	}
+
+	$query_string .= " order by date $optional->{order}";
+
+	if(defined $optional->{limit}) {
+		$query_string .= " limit $optional->{limit}";
+	}
+
+	$query_string .= ";";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@)
+	{
+		return $result;
+	}
+
+	$result->{code} = 0;
+
+	while($base_ref = $query->fetchrow_hashref) {
+		$base_ref = thread_details($base_ref->{id});
+		push @$array_threads, $base_ref->{response};
+	}
+
+	$result->{response} = $array_threads;
+	return $result;
+}
+
+sub thread_list_posts {
+	my $thread_id = shift;
+	my $optional = shift || {};
+
+	my $count = 0;
+	my $base_ref = {};
+	my $array_posts = [];
+	my $result = {code => 4, response => {}};
+	my $query_string = "select id from post where thread_id = $thread_id";
+
+	if(defined $optional->{since}) {
+		$query_string .= " and date >= '$optional->{since}'";
+	}
+
+	$query_string .= " order by date $optional->{order}";
+
+	if(defined $optional->{limit}) {
+		$query_string .= " limit $optional->{limit}";
+	}
+
+	$query_string .= ";";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@)
+	{
+		return $result;
+	}
+
+	$result->{code} = 0;
+
+	while($base_ref = $query->fetchrow_hashref) {
+		$base_ref = post_details($base_ref->{id});
+		push @$array_posts, $base_ref->{response};
+	}
+
+	$result->{response} = $array_posts;
+	return $result;
+}
+
+sub thread_remove {
+	my $id = shift;
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "select is_deleted, posts from thread where id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	my ($is_del, $posts) = $query->fetchrow_array;
+	$query->finish;
+	print "===debug thread.remove is_del: ".$is_del."\n";
+
+	if($is_del == 0 || $posts > 0) {
+		$query_string = "update thread set is_deleted = 1, posts = 0 where id = $id;";
+		print "===debug thread.remove(update thread): ".$query_string."\n";
+
+		$query = $dbh->prepare($query_string);
+		eval {
+			$res = $query->execute;
+		};
+		if($@) {
+			return $result;
+		}
+
+		$query_string = "update post set is_deleted = 1 where thread_id = $id;";
+		print "===debug thread.remove(update post): ".$query_string."\n";
+
+		$query = $dbh->prepare($query_string);
+		eval {
+			$res = $query->execute;
+		};
+		if($@) {
+			return $result;
+		}
+	}
+
+	$result->{code} = 0;
+	$result->{response} = { post => $id };
+	$query->finish;
+
+	return $result;
+}
+
+sub thread_restore {
+	my $id = shift;
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "select is_deleted from thread where id = $id;";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@) {
+		return $result;
+	}
+
+	my ($is_del) = $query->fetchrow_array;
+	$query->finish;
+
+	if($is_del == 1) {
+		$query_string = "select count(*) from post where thread_id = $id;";
+		print "===debug thread.restore(select post): ".$query_string."\n";
+
+		$query = $dbh->prepare($query_string);
+		eval {
+			$res = $query->execute;
+		};
+		if($@) {
+			return $result;
+		}
+
+		my ($count) = $query->fetchrow_array;
+
+		$query_string = "update thread set is_deleted = 0, posts = $count where id = $id;";
+		print "===debug thread.restore(update thread): ".$query_string."\n";
+
+		$query = $dbh->prepare($query_string);
+		eval {
+			$res = $query->execute;
+		};
+		if($@) {
+			return $result;
+		}
+
+		$query_string = "update post set is_deleted = 0 where thread_id = $id;";
+		print "===debug thread.restore(update post): ".$query_string."\n";
+
+		$query = $dbh->prepare($query_string);
+		eval {
+			$res = $query->execute;
+		};
+		if($@) {
+			return $result;
+		}
+	}
+
+	$result->{code} = 0;
+	$result->{response} = { post => $id };
+	$query->finish;
+
+	return $result;
+}
+
+#sub thread_close {
+#	my $id = shift;
+#	my $result = {code => 4, response => {}};
+
+#	my $query_string = "update thread set is_closed = 1 where id = $id;";
+
+#	my $query = $dbh->prepare($query_string);
+#	eval {
+#		$res = $query->execute;
+#	};
+#	if($@) {
+#		return $result;
+#	}
+
+#	$result->{code} = 0;
+#	$result->{response} = { post => $id };
+
+
+#	return $result;
+#}
 
 ######### /THREAD FUNC #########
 1;

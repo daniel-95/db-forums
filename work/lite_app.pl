@@ -155,6 +155,159 @@ get '/db/api/thread/details' => sub {
 	$c->render(text => to_json(thread_details($id, $related)));
 };
 
+get 'db/api/thread/list' => sub {
+	my $c = shift;
+	my $code = 0;
+	my $answer = {code => 0, response => {}};
+	my %optional = (since => undef, limit => undef, order => "desc");
+	my $entity = "forum";
+	my $param = undef;
+	my $order = "";
+
+	my $forum = $c->param("forum");
+	my $user = $c->param("user");
+
+	if(defined $forum) {
+		$entity = "forum";
+		$param = "'".$forum."'";
+	} elsif(defined $user) {
+		$entity = "user";
+		$param = "'".$user."'";
+	} else {
+		$answer->{code} = 3;
+	}
+
+	$optional{since} = $c->param("since");
+	$optional{limit} = $c->param("limit");
+
+	if(defined $c->param("order")) {
+		$order = $c->param("order");
+
+		if(lc $order ne "asc" && lc $order ne "desc") {
+			$answer->{code} = 3;
+		} else {
+			$optional{order} = $order;
+		}
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_list($entity, $param, \%optional);
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+get '/db/api/thread/listPosts' => sub {
+	my $c = shift;
+	my $code = 0;
+	my $answer = {code => 0, response => {}};
+	my %optional = (since => undef, limit => undef, order => "desc", sort => "flat");
+	my $thread_id = $c->param("thread");
+	my $order = "";
+	my $sort= "";
+
+	$optional{since} = $c->param("since");
+	$optional{limit} = $c->param("limit");
+
+	if(defined $c->param("order")) {
+		$order = $c->param("order");
+
+		if(lc $order ne "asc" && lc $order ne "desc") {
+			$answer->{code} = 3;
+		} else {
+			$optional{order} = $order;
+		}
+	}
+
+	if(defined $c->param("sort")) {
+		$sort = $c->param("sort");
+
+		if(lc $sort ne "flat" && lc $sort ne "tree" && lc $sort ne "parent_tree") {
+			$answer->{code} = 3;
+		} else {
+			$optional{sort} = $sort;
+		}
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_list_posts($thread_id, \%optional);
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/thread/remove' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{thread} && $json_data->{thread} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_remove($json_data->{thread});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/thread/restore' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{thread} && $json_data->{thread} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_restore($json_data->{thread});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/thread/close' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{thread} && $json_data->{thread} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = thread_close($json_data->{thread});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
 ########## POST ##########
 
 post '/db/api/post/create' => sub {
@@ -214,6 +367,151 @@ get '/db/api/post/details' => sub {
 	my $id = $c->param("post");						#id
 	my $related = $c->req->params->every_param("related") || undef;		#related
 	$c->render(text => to_json(post_details($id, $related)));
+};
+
+get 'db/api/post/list' => sub {
+	my $c = shift;
+	my $code = 0;
+	my $answer = {code => 0, response => {}};
+	my %optional = (since => undef, limit => undef, order => "desc");
+	my $entity = "forum";
+	my $param = undef;
+	my $order = "";
+
+	my $forum = $c->param("forum");
+	my $thread = $c->param("thread");
+
+	if(defined $forum) {
+		$entity = "forum";
+		$param = "'".$forum."'";
+	} elsif(defined $thread) {
+		$entity = "thread_id";
+		$param = $thread;
+	} else {
+		$answer->{code} = 3;
+	}
+
+	$optional{since} = $c->param("since");
+	$optional{limit} = $c->param("limit");
+
+	if(defined $c->param("order")) {
+		$order = $c->param("order");
+
+		if(lc $order ne "asc" && lc $order ne "desc") {
+			$answer->{code} = 3;
+		} else {
+			$optional{order} = $order;
+		}
+	}
+
+	if($answer->{code} == 0) {
+		$answer = post_list($entity, $param, \%optional);
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/post/remove' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{post} && $json_data->{post} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = post_remove($json_data->{post});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/post/restore' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{post} && $json_data->{post} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = post_restore($json_data->{post});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post 'db/api/post/update' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{post} && $json_data->{post} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+	unless(defined $json_data->{message}) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = post_update($json_data->{post}, $json_data->{message});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+post '/db/api/post/vote' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{post} && $json_data->{post} =~ m/^\d+/) {
+		$answer->{code} = 3;
+	}
+
+	unless(defined $json_data->{vote} && $json_data->{vote} =~ m/-?1/) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = post_vote($json_data->{post}, $json_data->{vote});
+	}
+
+	$c->render(text => to_json($answer));
 };
 
 ##### FUNCTIONS #####
