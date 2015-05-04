@@ -17,9 +17,14 @@ BEGIN
 				 &user_list_posts
 				 &user_update_profile
 				 &user_follow
+				 &user_unfollow
+				 &user_list_follow
 
 				 &create_forum 
 				 &forum_details 
+				 &forum_list_posts
+				 &forum_list_users
+				 &forum_list_threads
 
 				 &create_thread 
 				 &thread_details
@@ -170,7 +175,6 @@ sub change_posts_count {
 		return -1;
 	}
 	my $query_string = "select thread_id from post where id = $post_id;";
-	print "===debug change count(select): ".$query_string."\n";
 
 	my $query = $dbh->prepare($query_string);
 	eval {
@@ -183,7 +187,6 @@ sub change_posts_count {
 	@data = $query->fetchrow_array;
 
 	$query_string = "update thread set posts = posts $sign 1 where id = $data[0];";
-	print "===debug change count(update): ".$query_string."\n";
 	$query = $dbh->prepare($query_string);
 	$res = $query->execute;
 
@@ -338,52 +341,66 @@ sub user_follow {
 	return user_details($follower);
 }
 
-sub user_unfollow
-{
-	my $user_id1 = shift;
-	my $user_id2 = shift;
+sub user_unfollow {
+	my $follower = shift;
+	my $followee = shift;
 
-	my $email1 = get_email_by_id($user_id1);
-	my $email2 = get_email_by_id($user_id2);
-
-	$query = $dbh->prepare("DELETE FROM follow where follower_id = $user_id1 and followee_id = $user_id2;");
+	$query = $dbh->prepare("delete from follow where follower = '$follower' and followee = '$followee';");
 	$res = $query->execute;
 	$query->finish;
 
-	return user_details($email1);
+	return user_details($follower);
 }
 
-sub user_list_follow #type = follower/followee, email, %params {since_id = undef, order = ASC/DESC, limit} 
+sub user_list_follow # type, email, %params {since_id = undef, order = ASC/DESC, limit} 
 {
-	my $type = shift;
-	my $email = shift;
-	my $params = shift;
-	my $result = {code => "", response => ""};
-	my $id = get_id_by_email($email) || undef;
-	my $ids = [];
+	my $type = shift;		#follower/followee
+	my $user = shift;
+	my $optional = shift || {};
 
-	$params->{order} = "DESC" unless defined $params->{order};
+	my $count = 0;
+	my $base_ref = {};
+	my $array_users = [];
+	my $result = {code => 4, response => {}};
 
-	my $where = $type eq "follower" ? "followee" : "follower";
-
-	my $query_str = "SELECT u.email from follow f JOIN user u on u.id = f.$type"."_id"." where $where"."_id"." = $id";
-
-	$query_str .= " and $type"."_id >= $params->{since_id}" if defined $params->{since_id};
-	$query_str .= " order by u.name $params->{order}";
-	$query_str .= " LIMIT $params->{limit}" if defined $params->{limit};
-
-	$query_str .= ";";
-
-	my $query = $dbh->prepare($query_str);
-	$res = $query->execute;
-
-	while($fol_id = $query->fetchrow_array)
-	{
-		push @$ids, user_details($fol_id);
+	unless($type eq "follower" || $type eq "followee") {
+		$result->{code} = 3;
+		return $result;
 	}
-	$result->{code} = 0;
-	$result->{response} = $ids;
 
+	my $pair = $type eq "follower" ? "followee" : "follower";
+
+	my $query_string = "select u.email from follow f JOIN user u ON u.email = f.$type where f.$pair = '$user'";
+
+	if(defined $optional->{since_id}) {
+		$query_string .= " and u.id >= $optional->{since_id}";
+	}
+
+	$query_string .= " order by u.name $optional->{order}";
+
+	if(defined $optional->{limit}) {
+		$query_string .= " limit $optional->{limit}";
+	}
+
+	$query_string .= ";";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@)
+	{
+		return $result;
+	}
+
+	$result->{code} = 0;
+
+	while($base_ref = $query->fetchrow_hashref) {
+		$base_ref = user_details($base_ref->{email});
+		push @$array_users, $base_ref->{response};
+	}
+
+	$result->{response} = $array_users;
 	return $result;
 }
 
@@ -392,7 +409,6 @@ sub user_list_posts { # user [, since, order, limit]
 	my $optional = shift || {};
 
 	my $count = 0;
-	my $order = "desc";
 	my $base_ref = {};
 	my $array_posts = [];
 	my $result = {code => 4, response => {}};
@@ -538,6 +554,155 @@ sub forum_details #short_name, [related]
 	return $result;
 }
 
+sub forum_list_posts { 
+	my $forum = shift;
+	my $optional = shift || {};
+	my $related = shift;
+
+	my $count = 0;
+	my $base_ref = {};
+	my $array_posts = [];
+	my $result = {code => 4, response => {}};
+	my $query_string = "select id from post where forum = '$forum'";
+
+	my @rslt = grep {
+  		my $t = $_;
+  		! grep { $_ eq $t } ("forum", "user", "thread");
+	} @$related;
+
+	if(scalar keys @rslt) {
+		$result->{code} = 3;
+		return $result;
+	}
+
+	if(defined $optional->{since}) {
+		$query_string .= " and date >= '$optional->{since}'";
+	}
+
+	$query_string .= " order by date $optional->{order}";
+
+	if(defined $optional->{limit}) {
+		$query_string .= " limit $optional->{limit}";
+	}
+
+	$query_string .= ";";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@)
+	{
+		return $result;
+	}
+
+	$result->{code} = 0;
+
+	while($base_ref = $query->fetchrow_hashref) {
+		$base_ref = post_details($base_ref->{id}, $related);
+		push @$array_posts, $base_ref->{response};
+	}
+
+	$result->{response} = $array_posts;
+	return $result;
+}
+
+sub forum_list_users {
+	my $forum = shift;
+	my $optional = shift || {};
+
+	my $count = 0;
+	my $base_ref = {};
+	my $array_users = [];
+	my $result = {code => 4, response => {}};
+
+	my $query_string = "select distinct u.email from post p JOIN user u ON u.email = p.user where forum = '$forum'";
+
+	if(defined $optional->{since_id}) {
+		$query_string .= " and u.id >= $optional->{since_id}";
+	}
+
+	$query_string .= " order by u.name $optional->{order}";
+
+	if(defined $optional->{limit}) {
+		$query_string .= " limit $optional->{limit}";
+	}
+
+	$query_string .= ";";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@)
+	{
+		return $result;
+	}
+
+	$result->{code} = 0;
+
+	while($base_ref = $query->fetchrow_hashref) {
+		$base_ref = user_details($base_ref->{email});
+		push @$array_users, $base_ref->{response};
+	}
+
+	$result->{response} = $array_users;
+	return $result;
+}
+
+sub forum_list_threads { 
+	my $forum = shift;
+	my $optional = shift || {};
+	my $related = shift;
+
+	my $count = 0;
+	my $base_ref = {};
+	my $array_threads = [];
+	my $result = {code => 4, response => {}};
+	my $query_string = "select id from thread where forum = '$forum'";
+
+	my @rslt = grep {
+  		my $t = $_;
+  		! grep { $_ eq $t } ("forum", "user");
+	} @$related;
+
+	if(scalar keys @rslt) {
+		$result->{code} = 3;
+		return $result;
+	}
+
+	if(defined $optional->{since}) {
+		$query_string .= " and date >= '$optional->{since}'";
+	}
+
+	$query_string .= " order by date $optional->{order}";
+
+	if(defined $optional->{limit}) {
+		$query_string .= " limit $optional->{limit}";
+	}
+
+	$query_string .= ";";
+
+	my $query = $dbh->prepare($query_string);
+	eval {
+		$res = $query->execute;
+	};
+	if($@)
+	{
+		return $result;
+	}
+
+	$result->{code} = 0;
+
+	while($base_ref = $query->fetchrow_hashref) {
+		$base_ref = thread_details($base_ref->{id}, $related);
+		push @$array_threads, $base_ref->{response};
+	}
+
+	$result->{response} = $array_threads;
+	return $result;
+}
+
 ######### /FORUM FUNC ##########
 
 ######### POST FUNC #########
@@ -611,7 +776,6 @@ sub post_details # id [, related(user, forum, thread)]
 
 	my $result = {code => 4, response => {}};
 	my $query_string = "select * from post where id = $id;";
-	$query_string = "select * from post order by id DESC limit 1;" if($id == -1);
 
 	my $query = $dbh->prepare($query_string);
 	eval {
@@ -644,7 +808,7 @@ sub post_details # id [, related(user, forum, thread)]
 	if(in_array("thread", $related))
 	{
 		$details_ref = thread_details($base_ref->{thread_id});
-		$base_ref->{thread} = $details_ref->{response};
+		$base_ref->{thread_id} = $details_ref->{response};
 	}
 
 	$base_ref->{isDeleted} = delete $base_ref->{is_deleted} eq "0" ? Mojo::JSON->false : Mojo::JSON->true;
@@ -658,8 +822,13 @@ sub post_details # id [, related(user, forum, thread)]
 	$base_ref->{points} = $base_ref->{likes} - $base_ref->{dislikes};
 	$base_ref->{parent} = delete $base_ref->{parent_id};
 	$base_ref->{parent} += 0 if(defined $base_ref->{parent});
+
 	$base_ref->{thread} = delete $base_ref->{thread_id};
-	$base_ref->{thread} += 0;
+
+	unless(in_array("thread", $related)) {
+		$base_ref->{thread} += 0;
+	}
+
 	$base_ref->{id}  = $id + 0;
 
 	$result->{code} = 0;
@@ -1051,11 +1220,9 @@ sub thread_remove {
 
 	my ($is_del, $posts) = $query->fetchrow_array;
 	$query->finish;
-	print "===debug thread.remove is_del: ".$is_del."\n";
 
 	if($is_del == 0 || $posts > 0) {
 		$query_string = "update thread set is_deleted = 1, posts = 0 where id = $id;";
-		print "===debug thread.remove(update thread): ".$query_string."\n";
 
 		$query = $dbh->prepare($query_string);
 		eval {
@@ -1066,7 +1233,6 @@ sub thread_remove {
 		}
 
 		$query_string = "update post set is_deleted = 1 where thread_id = $id;";
-		print "===debug thread.remove(update post): ".$query_string."\n";
 
 		$query = $dbh->prepare($query_string);
 		eval {
@@ -1103,7 +1269,6 @@ sub thread_restore {
 
 	if($is_del == 1) {
 		$query_string = "select count(*) from post where thread_id = $id;";
-		print "===debug thread.restore(select post): ".$query_string."\n";
 
 		$query = $dbh->prepare($query_string);
 		eval {
@@ -1116,7 +1281,6 @@ sub thread_restore {
 		my ($count) = $query->fetchrow_array;
 
 		$query_string = "update thread set is_deleted = 0, posts = $count where id = $id;";
-		print "===debug thread.restore(update thread): ".$query_string."\n";
 
 		$query = $dbh->prepare($query_string);
 		eval {
@@ -1127,7 +1291,6 @@ sub thread_restore {
 		}
 
 		$query_string = "update post set is_deleted = 0 where thread_id = $id;";
-		print "===debug thread.restore(update post): ".$query_string."\n";
 
 		$query = $dbh->prepare($query_string);
 		eval {

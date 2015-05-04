@@ -60,18 +60,6 @@ get '/db/api/user/details' => sub {
 	$c->render(text => to_json(user_details($email)));
 };
 
-get '/db/api/user/listFollowers' => sub {
-	my $c = shift;
-	my %params = ("since_id" => undef, "order" => "DESC", "limit" => 5);
-	$c->render(text => to_json(user_list_follow('follower', 'user777@mail.ru', \%params)));
-};
-
-get '/db/api/user/listFollowing' => sub {
-	my $c = shift;
-	my %params = ("since_id" => 0, "order" => "ASC", "limit" => undef);
-	$c->render(text => to_json(user_list_follow('followee', 'user777@mail.ru', \%params)));
-};
-
 get 'db/api/user/listPosts' => sub {
 	my $c = shift;
 	my $order = "desc";
@@ -152,6 +140,98 @@ post 'db/api/user/follow' => sub {
 	$c->render(text => to_json($answer));
 };
 
+post 'db/api/user/unfollow' => sub {
+	my $c = shift;
+	my $json_data = {};
+	my $answer = {code => 0, response => {}};
+	my $body = $c->req->body;
+
+	eval {
+	 	$json_data = from_json($body);
+	};
+	if ($@) {
+	 	$answer->{code} = 2;
+	}
+
+	unless(defined $json_data->{follower} && defined $json_data->{followee}) {
+		$answer->{code} = 3;
+	}
+
+	if($answer->{code} == 0) {
+		$answer = user_unfollow($json_data->{follower}, $json_data->{followee});
+	}
+
+	$c->render(text => to_json($answer));
+};
+
+get 'db/api/user/listFollowers' => sub {
+	my $c = shift;
+	my $order = "desc";
+	my $answer = {code => 0, response => {}};
+	my %optional = (since_id => undef, limit => undef, order => "desc");
+
+	my $user = $c->param("user");
+
+	unless(defined $user) {
+		$answer->{code} = 3;
+		return $answer;
+	}
+
+	$optional{since_id} = $c->param("since_id");
+	$optional{limit} = $c->param("limit");
+
+	if(defined $c->param("order")) {
+		$order = $c->param("order");
+
+		if(lc $order ne "asc" && lc $order ne "desc") {
+			$answer->{code} = 3;
+		} else {
+			$optional{order} = $order;
+		}
+	}
+
+	if($answer->{code} == 0) {
+		$answer = user_list_follow("follower", $user, \%optional);
+	}
+	print "\n".to_json($answer)."\n\n";
+
+	$c->render(text => to_json($answer));
+};
+
+get 'db/api/user/listFollowing' => sub {
+	my $c = shift;
+	my $order = "desc";
+	my $answer = {code => 0, response => {}};
+	my %optional = (since_id => undef, limit => undef, order => "desc");
+
+	my $user = $c->param("user");
+
+	unless(defined $user) {
+		$answer->{code} = 3;
+		return $answer;
+	}
+
+	$optional{since_id} = $c->param("since_id");
+	$optional{limit} = $c->param("limit");
+
+	if(defined $c->param("order")) {
+		$order = $c->param("order");
+
+		if(lc $order ne "asc" && lc $order ne "desc") {
+			$answer->{code} = 3;
+		} else {
+			$optional{order} = $order;
+		}
+	}
+
+	if($answer->{code} == 0) {
+		$answer = user_list_follow("followee", $user, \%optional);
+	}
+	print "\n".to_json($answer)."\n\n";
+
+	$c->render(text => to_json($answer));
+};
+
 ########## FORUM ##########
 
 post '/db/api/forum/create' => sub {
@@ -187,6 +267,112 @@ get '/db/api/forum/details' => sub {
 	my $forum = $c->param("forum");						#short_name
 	my $related = $c->param("related") || undef;		#related
 	$c->render(text => to_json(forum_details($forum, $related)));
+};
+
+get 'db/api/forum/listPosts' => sub {
+	my $c = shift;
+	my $order = "desc";
+	my $answer = {code => 0, response => {}};
+	my $related;
+	my %optional = (since => undef, limit => undef, order => "desc");
+
+	my $forum = $c->param("forum");
+
+	unless(defined $forum) {
+		$answer->{code} = 3;
+		return $answer;
+	}
+
+	$optional{since} = $c->param("since");
+	$optional{limit} = $c->param("limit");
+	$related = $c->req->params->every_param("related");
+
+	if(defined $c->param("order")) {
+		$order = $c->param("order");
+
+		if(lc $order ne "asc" && lc $order ne "desc") {
+			$answer->{code} = 3;
+		} else {
+			$optional{order} = $order;
+		}
+	}
+
+	if($answer->{code} == 0) {
+		$answer = forum_list_posts($forum, \%optional, $related);
+	}
+	print "\n".to_json($answer)."\n\n";
+
+	$c->render(text => to_json($answer));
+};
+
+get 'db/api/forum/listUsers' => sub {
+	my $c = shift;
+	my $order = "desc";
+	my $answer = {code => 0, response => {}};
+	my %optional = (since_id => undef, limit => undef, order => "desc");
+
+	my $forum = $c->param("forum");
+
+	unless(defined $forum) {
+		$answer->{code} = 3;
+		return $answer;
+	}
+
+	$optional{since_id} = $c->param("since_id");
+	$optional{limit} = $c->param("limit");
+
+	if(defined $c->param("order")) {
+		$order = $c->param("order");
+
+		if(lc $order ne "asc" && lc $order ne "desc") {
+			$answer->{code} = 3;
+		} else {
+			$optional{order} = $order;
+		}
+	}
+
+	if($answer->{code} == 0) {
+		$answer = forum_list_users($forum, \%optional);
+	}
+	print "\n".to_json($answer)."\n\n";
+
+	$c->render(text => to_json($answer));
+};
+
+get 'db/api/forum/listThreads' => sub {
+	my $c = shift;
+	my $order = "desc";
+	my $answer = {code => 0, response => {}};
+	my $related;
+	my %optional = (since => undef, limit => undef, order => "desc");
+
+	my $forum = $c->param("forum");
+
+	unless(defined $forum) {
+		$answer->{code} = 3;
+		return $answer;
+	}
+
+	$optional{since} = $c->param("since");
+	$optional{limit} = $c->param("limit");
+	$related = $c->req->params->every_param("related");
+
+	if(defined $c->param("order")) {
+		$order = $c->param("order");
+
+		if(lc $order ne "asc" && lc $order ne "desc") {
+			$answer->{code} = 3;
+		} else {
+			$optional{order} = $order;
+		}
+	}
+
+	if($answer->{code} == 0) {
+		$answer = forum_list_threads($forum, \%optional, $related);
+	}
+	print "\n".to_json($answer)."\n\n";
+
+	$c->render(text => to_json($answer));
 };
 
 ########## THREAD ##########

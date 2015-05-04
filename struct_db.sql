@@ -24,21 +24,16 @@ DROP TABLE IF EXISTS `follow`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `follow` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `follower_id` int(10) unsigned NOT NULL,
-  `followee_id` int(10) unsigned NOT NULL,
+  `follower` varchar(255) DEFAULT NULL,
+  `followee` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `follower_ee` (`follower_id`,`followee_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  UNIQUE KEY `follower_ee` (`follower`,`followee`),
+  UNIQUE KEY `unique_pair` (`follower`,`followee`),
+  KEY `followee_FK` (`followee`),
+  CONSTRAINT `followee_FK` FOREIGN KEY (`followee`) REFERENCES `user` (`email`),
+  CONSTRAINT `follower_FK` FOREIGN KEY (`follower`) REFERENCES `user` (`email`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `follow`
---
-
-LOCK TABLES `follow` WRITE;
-/*!40000 ALTER TABLE `follow` DISABLE KEYS */;
-/*!40000 ALTER TABLE `follow` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `forum`
@@ -57,17 +52,8 @@ CREATE TABLE `forum` (
   UNIQUE KEY `short_name` (`short_name`),
   KEY `user_id` (`user_id`),
   CONSTRAINT `forum_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `forum`
---
-
-LOCK TABLES `forum` WRITE;
-/*!40000 ALTER TABLE `forum` DISABLE KEYS */;
-/*!40000 ALTER TABLE `forum` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `post`
@@ -100,17 +86,8 @@ CREATE TABLE `post` (
   CONSTRAINT `post_ibfk_2` FOREIGN KEY (`parent_id`) REFERENCES `post` (`id`),
   CONSTRAINT `post_ibfk_3` FOREIGN KEY (`user`) REFERENCES `user` (`email`),
   CONSTRAINT `post_ibfk_4` FOREIGN KEY (`forum`) REFERENCES `forum` (`short_name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `post`
---
-
-LOCK TABLES `post` WRITE;
-/*!40000 ALTER TABLE `post` DISABLE KEYS */;
-/*!40000 ALTER TABLE `post` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `subscription`
@@ -121,20 +98,15 @@ DROP TABLE IF EXISTS `subscription`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `subscription` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `user_id` int(10) unsigned NOT NULL,
+  `user` varchar(255) DEFAULT NULL,
   `thread_id` int(10) unsigned NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_thread` (`user`,`thread_id`),
+  KEY `subscription_thread_id` (`thread_id`),
+  CONSTRAINT `subscription_ibfk_1` FOREIGN KEY (`user`) REFERENCES `user` (`email`),
+  CONSTRAINT `subscription_thread_id` FOREIGN KEY (`thread_id`) REFERENCES `thread` (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `subscription`
---
-
-LOCK TABLES `subscription` WRITE;
-/*!40000 ALTER TABLE `subscription` DISABLE KEYS */;
-/*!40000 ALTER TABLE `subscription` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `thread`
@@ -162,17 +134,8 @@ CREATE TABLE `thread` (
   KEY `user_id` (`user`),
   CONSTRAINT `fk_forum_short` FOREIGN KEY (`forum`) REFERENCES `forum` (`short_name`),
   CONSTRAINT `fk_name` FOREIGN KEY (`user`) REFERENCES `user` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `thread`
---
-
-LOCK TABLES `thread` WRITE;
-/*!40000 ALTER TABLE `thread` DISABLE KEYS */;
-/*!40000 ALTER TABLE `thread` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `user`
@@ -190,17 +153,8 @@ CREATE TABLE `user` (
   `name` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `user`
---
-
-LOCK TABLES `user` WRITE;
-/*!40000 ALTER TABLE `user` DISABLE KEYS */;
-/*!40000 ALTER TABLE `user` ENABLE KEYS */;
-UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -211,4 +165,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2015-04-30 22:42:14
+-- Dump completed on 2015-05-04 17:15:26
