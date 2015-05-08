@@ -193,7 +193,6 @@ get 'db/api/user/listFollowers' => sub {
 	if($answer->{code} == 0) {
 		$answer = user_list_follow("follower", $user, \%optional);
 	}
-	print "\n".to_json($answer)."\n\n";
 
 	$c->render(text => to_json($answer));
 };
@@ -227,7 +226,6 @@ get 'db/api/user/listFollowing' => sub {
 	if($answer->{code} == 0) {
 		$answer = user_list_follow("followee", $user, \%optional);
 	}
-	print "\n".to_json($answer)."\n\n";
 
 	$c->render(text => to_json($answer));
 };
@@ -300,7 +298,6 @@ get 'db/api/forum/listPosts' => sub {
 	if($answer->{code} == 0) {
 		$answer = forum_list_posts($forum, \%optional, $related);
 	}
-	print "\n".to_json($answer)."\n\n";
 
 	$c->render(text => to_json($answer));
 };
@@ -334,7 +331,6 @@ get 'db/api/forum/listUsers' => sub {
 	if($answer->{code} == 0) {
 		$answer = forum_list_users($forum, \%optional);
 	}
-	print "\n".to_json($answer)."\n\n";
 
 	$c->render(text => to_json($answer));
 };
@@ -370,7 +366,6 @@ get 'db/api/forum/listThreads' => sub {
 	if($answer->{code} == 0) {
 		$answer = forum_list_threads($forum, \%optional, $related);
 	}
-	print "\n".to_json($answer)."\n\n";
 
 	$c->render(text => to_json($answer));
 };
