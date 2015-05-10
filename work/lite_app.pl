@@ -405,6 +405,7 @@ post '/db/api/thread/create' => sub {
 		$answer->{code} = $code;
 		$answer->{response} = {};
 	}
+	print "\n", to_json($answer), "\n";
 
 	$c->render(text => to_json($answer));
 };
