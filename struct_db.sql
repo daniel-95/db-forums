@@ -28,9 +28,8 @@ CREATE TABLE `follow` (
   `followee` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_pair` (`follower`,`followee`),
-  KEY `followee_FK` (`followee`),
-  CONSTRAINT `followee_FK` FOREIGN KEY (`followee`) REFERENCES `user` (`email`),
-  CONSTRAINT `follower_FK` FOREIGN KEY (`follower`) REFERENCES `user` (`email`)
+  FOREIGN KEY (`followee`) REFERENCES `user` (`email`),
+  FOREIGN KEY (`follower`) REFERENCES `user` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -49,8 +48,7 @@ CREATE TABLE `forum` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`),
   UNIQUE KEY `short_name` (`short_name`),
-  KEY `user_id` (`user_id`),
-  CONSTRAINT `forum_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
+  FOREIGN KEY (`user_id`) REFERENCES `user` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -77,14 +75,10 @@ CREATE TABLE `post` (
   `likes` int(10) unsigned NOT NULL DEFAULT '0',
   `dislikes` int(10) unsigned NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
-  KEY `fk_thread_id` (`thread_id`),
-  KEY `fk_parent_id` (`parent_id`),
-  KEY `fk_user` (`user`),
-  KEY `fk_forum` (`forum`),
-  CONSTRAINT `fk_forum` FOREIGN KEY (`forum`) REFERENCES `forum` (`short_name`),
-  CONSTRAINT `fk_parent_id` FOREIGN KEY (`parent_id`) REFERENCES `post` (`id`),
-  CONSTRAINT `fk_thread_id` FOREIGN KEY (`thread_id`) REFERENCES `thread` (`id`),
-  CONSTRAINT `fk_user` FOREIGN KEY (`user`) REFERENCES `user` (`email`)
+  FOREIGN KEY (`forum`) REFERENCES `forum` (`short_name`),
+  FOREIGN KEY (`parent_id`) REFERENCES `post` (`id`),
+  FOREIGN KEY (`thread_id`) REFERENCES `thread` (`id`),
+  FOREIGN KEY (`user`) REFERENCES `user` (`email`)
 ) ENGINE=InnoDB AUTO_INCREMENT=940176 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -101,9 +95,8 @@ CREATE TABLE `subscription` (
   `thread_id` int(10) unsigned NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_thread` (`user`,`thread_id`),
-  KEY `subscription_thread_id` (`thread_id`),
-  CONSTRAINT `subscription_ibfk_1` FOREIGN KEY (`user`) REFERENCES `user` (`email`),
-  CONSTRAINT `subscription_thread_id` FOREIGN KEY (`thread_id`) REFERENCES `thread` (`id`)
+  FOREIGN KEY (`user`) REFERENCES `user` (`email`),
+  FOREIGN KEY (`thread_id`) REFERENCES `thread` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -128,10 +121,8 @@ CREATE TABLE `thread` (
   `dislikes` smallint(5) unsigned NOT NULL DEFAULT '0',
   `posts` int(11) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
-  KEY `forum_id` (`forum`),
-  KEY `user_id` (`user`),
-  CONSTRAINT `fk_forum_short` FOREIGN KEY (`forum`) REFERENCES `forum` (`short_name`),
-  CONSTRAINT `fk_name` FOREIGN KEY (`user`) REFERENCES `user` (`email`)
+  FOREIGN KEY (`forum`) REFERENCES `forum` (`short_name`),
+  FOREIGN KEY (`user`) REFERENCES `user` (`email`)
 ) ENGINE=InnoDB AUTO_INCREMENT=10001 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
